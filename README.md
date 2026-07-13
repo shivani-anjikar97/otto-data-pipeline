@@ -1,42 +1,191 @@
-## Task
-Envision yourself working at OTTO, engaging with the business analyst of your team regarding the recent meeting with the
-marketing department. You inquire about the next steps for the data pipeline supporting the PowerBI reports.
-The business analyst reveals that the marketing department is keen on a new visualization depicting the financial data
-for January 2025, where they can see the revenue of every product for every day (even if it was not sold).
+# OTTO Data Engineering Assignment
 
-Further discussion with the analyst covers the required data model for the PowerBI reports.
-He notes that the current data model is straightforward, comprising a single table named "revenue" with the following
-columns (excluding technical column(s)):
+## Overview
 
-- sku_id (TEXT)
-- date_id (DATE)
-- price (REAL)
-- sales (INT)
-- revenue (REAL)
+This project implements a simple data pipeline to generate a **revenue** table for January 2025 based on the provided **product** and **sales** data.
 
-With this in mind, you plan to establish a new data pipeline to generate the new table within the existing database.
-You will utilize data from the existing "product" and "sales" data (csv and or db) to construct the new table.
+The final table is designed to support Power BI reporting by ensuring that **every product appears for every day in January 2025**, even if no sales occurred on a particular day.
 
-## Technical Requirements & Data
-Our operations are conducted within GCP, utilizing BigQuery as our data warehouse. However, for this interview task,
-we will opt for a local database (sqlite) and two CSV files provided in designated directories.
-The CSV files, located in the "data" directory and named "product.csv" and "sales.csv," contain the exact same data as
-the pre-existing database tables.
-- product: all the product data is in there.
-- sales: only products that have been sold are in there. order_id is the identifier of the basket and every product
-(sku) can be sold multiple times in different orders every day.
+---
 
-## Expectations
-Approach the task with a production mindset and act like you are preparing a PR for discussion.
-Consider the data directory with CSV files as your GCS bucket and the sqlite database as your BigQuery.
-Utilize your preferred development environment and methodology. Please use the following languages:
+## Tech Stack
 
-- Python
+- Python 3.x
+- SQLite
 - SQL
+- Pandas
 
-## Evaluation
-You will have 10 minutes to present your approach, followed by a discussion lasting up to 30 minutes.
+---
 
-## Submission
-Please submit your solution via email to your OTTO contact person. Ensure your submission is received by 9 a.m. CEST
-the day before the interview at the latest.
+## Project Structure
+
+```
+otto-data-pipeline/
+│
+├── data/
+│   ├── product.csv
+│   └── sales.csv
+│
+├── sql/
+│   └── revenue.sql
+│
+├── src/
+│   └── pipeline.py
+│
+├── product_sales.db
+├── requirements.txt
+└── README.md
+```
+
+---
+
+## Files Description
+
+### `data/`
+
+Contains the source CSV files provided with the assignment.
+
+- `product.csv`
+- `sales.csv`
+
+---
+
+### `product_sales.db`
+
+SQLite database provided as part of the assignment.
+
+Contains the following tables:
+
+- `product`
+- `sales`
+
+The solution creates an additional table:
+
+- `revenue`
+
+---
+
+### `sql/revenue.sql`
+
+Contains the complete SQL transformation logic.
+
+The SQL performs the following steps:
+
+1. Generates all dates for January 2025.
+2. Creates every product-date combination using a **CROSS JOIN**.
+3. Joins sales data using a **LEFT JOIN**.
+4. Aggregates multiple sales for the same product and day.
+5. Replaces missing sales with `0`.
+6. Calculates revenue.
+
+---
+
+### `src/pipeline.py`
+
+Acts as the orchestration layer.
+
+Responsibilities:
+
+- Connects to the SQLite database.
+- Executes the SQL script.
+- Creates the `revenue` table.
+- Displays sample output for verification.
+
+---
+
+## Revenue Calculation
+
+The final revenue table contains the following columns:
+
+| Column | Description |
+|----------|-------------|
+| sku_id | Product identifier |
+| date_id | Date in January 2025 |
+| price | Product price |
+| sales | Total units sold on that day |
+| revenue | Price × Sales |
+
+Revenue is calculated as:
+
+```
+Revenue = Price × Sales
+```
+
+Products without sales are included with:
+
+```
+Sales = 0
+Revenue = 0
+```
+
+---
+
+## SQL Logic
+
+The transformation follows these steps:
+
+1. Generate a calendar for January 2025.
+2. Create every possible combination of:
+   - Product
+   - Date
+3. Left join the sales table.
+4. Aggregate daily sales using `SUM(sales)`.
+5. Replace NULL values using `COALESCE`.
+6. Calculate revenue.
+
+This ensures one record per product per day.
+
+---
+
+## How to Run
+
+### 1. Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 2. Execute the pipeline
+
+```bash
+python src/pipeline.py
+```
+
+---
+
+## Expected Output
+
+The pipeline creates a new table named:
+
+```
+revenue
+```
+
+Expected number of rows:
+
+```
+1000 Products × 31 Days = 31,000 Records
+```
+
+---
+
+## Assumptions
+
+- Product price is sourced from the `product` table.
+- Revenue is calculated as `Price × Sales`.
+- Multiple sales for the same product on the same day are aggregated using `SUM(sales)`.
+- Only January 2025 data is included.
+- Products with no sales on a given day are included with zero sales and zero revenue.
+
+---
+
+## Future Improvements
+
+Given more time, the following enhancements could be added:
+
+- Logging
+- Configuration file for database paths
+- Data quality validations
+- Unit tests
+- Parameterized date range
+- Support for BigQuery instead of SQLite
